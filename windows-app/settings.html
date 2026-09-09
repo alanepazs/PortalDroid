@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PortalDroid</title>
+<style>
+  :root {
+    --fondo: #12151a; --tarjeta: #1c2027; --texto: #e8eaed;
+    --suave: #9aa0a6; --borde: #2c313a; --verde: #7ee2a8; --rojo: #f0a1a1;
+    --activo: #50c8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 26px 24px;
+    font: 13.5px/1.5 "Segoe UI", system-ui, sans-serif;
+    background: var(--fondo); color: var(--texto); user-select: none;
+    /* La ventana se abre justo del alto del contenido, así que la barra de
+       desplazamiento no aparece sola. Pero SÍ tiene que aparecer si achicás
+       la ventana a mano: si no, lo que queda afuera es inalcanzable. */
+  }
+  /* Barra fina y del color del fondo: se ve solo cuando hace falta. */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--borde); border-radius: 5px;
+    border: 3px solid var(--fondo);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #3b414c; }
+  h2 {
+    font-size: 11px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--suave); margin: 18px 0 8px;
+  }
+  h2:first-of-type { margin-top: 14px; }
+
+  /* ---- Pestañas ---- */
+  .pestanas {
+    display: flex; gap: 4px; padding-top: 16px;
+    border-bottom: 1px solid var(--borde); margin-bottom: 2px;
+  }
+  .pestana {
+    padding: 8px 16px; cursor: pointer; color: var(--suave);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    font-size: 13.5px;
+  }
+  .pestana:hover { color: var(--texto); }
+  .pestana.activa { color: var(--texto); border-bottom-color: var(--activo); }
+  .hoja { display: none; }
+  .hoja.activa { display: block; }
+
+  /* ---- Mapa de monitores ---- */
+  #mapa {
+    position: relative; background: var(--tarjeta);
+    border-radius: 12px; padding: 16px; height: 230px;
+  }
+  .pantalla { position: absolute; border: 2px solid var(--borde); border-radius: 7px; background: #171b21; }
+  .etiqueta {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: var(--suave); font-size: 11.5px; pointer-events: none; gap: 2px;
+  }
+  .etiqueta b { color: var(--texto); font-size: 13px; font-weight: 600; }
+  .borde { position: absolute; background: #333a45; border-radius: 3px; cursor: pointer; }
+  .borde:hover { background: #4a5361; }
+  .borde.elegido { background: var(--activo); box-shadow: 0 0 10px 2px var(--activo); }
+  /* Rayado, no escondido: así se entiende POR QUÉ no se puede usar. */
+  .borde.bloqueado {
+    background: repeating-linear-gradient(45deg, #2a2f38, #2a2f38 3px, #1e222a 3px, #1e222a 6px);
+    cursor: not-allowed;
+  }
+
+  /* ---- Controles ---- */
+  .fila { display: flex; align-items: center; gap: 12px; margin: 9px 0; }
+  .fila label { min-width: 88px; color: var(--suave); }
+  .valor { min-width: 52px; text-align: right; color: var(--texto); font-variant-numeric: tabular-nums; }
+
+  /* Deslizador con perilla, NO barra de carga.
+     Una barra que se llena de izquierda a derecha se lee como volumen o
+     progreso. Acá lo que importa es DÓNDE está la perilla sobre el recorrido,
+     así que el riel se ve parejo y sólo se mueve el botón. */
+  input[type=range] {
+    flex: 1; appearance: none; -webkit-appearance: none;
+    background: transparent; height: 22px; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px; background: var(--borde);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px;
+    border-radius: 50%; background: var(--texto);
+    border: 3px solid var(--activo); box-shadow: 0 1px 3px rgba(0,0,0,.5);
+  }
+  input[type=range]:hover::-webkit-slider-thumb { background: #fff; }
+
+  input[type=color] {
+    width: 46px; height: 30px; padding: 0; border: 1px solid var(--borde);
+    border-radius: 7px; background: none; cursor: pointer;
+  }
+  .colores { display: flex; gap: 7px; }
+  .muestra { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .muestra.activa { border-color: var(--texto); }
+  .nota { color: var(--suave); font-size: 12px; margin-top: 10px; }
+  .nota b { color: var(--texto); font-weight: 600; }
+  input[type=checkbox] { accent-color: var(--activo); width: 15px; height: 15px; }
+
+  /* ---- Pestaña del QR ---- */
+  .qr-caja { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 8px; }
+  /* Sobre blanco sí o sí: sobre fondo oscuro muchas cámaras fallan. */
+  #marco { background: #fff; padding: 13px; border-radius: 13px; line-height: 0; }
+  #img { width: 220px; height: 220px; display: block; }
+  .pasos { width: 100%; background: var(--tarjeta); border-radius: 12px; padding: 13px 16px; }
+  .paso { display: flex; gap: 11px; align-items: flex-start; padding: 3px 0; }
+  .n {
+    flex: none; width: 20px; height: 20px; border-radius: 50%;
+    background: #2c313a; color: var(--activo); font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .paso span { color: #c4c7ca; }
+  b { color: var(--texto); font-weight: 600; }
+  #estado {
+    width: 100%; padding: 11px 14px; border-radius: 11px; text-align: center;
+    background: var(--tarjeta); color: var(--suave); transition: background .2s, color .2s;
+  }
+  #estado.ok { background: #10331f; color: var(--verde); }
+  #estado.mal { background: #3a1d1d; color: var(--rojo); }
+</style>
+</head>
+<body>
+
+<div class="pestanas">
+  <div class="pestana activa" data-hoja="halo">Halo</div>
+  <div class="pestana" data-hoja="qr">Conectar el celular</div>
+</div>
+
+<!-- ============ HALO ============ -->
+<div class="hoja activa" id="hoja-halo">
+  <h2>Dónde poner el halo</h2>
+  <div class="nota" style="margin:-4px 0 8px">
+    Hacé clic en el borde de un monitor. Los rayados dan contra otra pantalla
+    y no se pueden usar: por ahí pasa el mouse de una a la otra.
+  </div>
+  <div id="mapa"></div>
+
+  <h2>Posición sobre el borde</h2>
+  <div class="fila">
+    <label>Posición</label>
+    <input type="range" id="pos" min="0" max="100" step="1">
+    <span class="valor" id="posValor"></span>
+  </div>
+  <div class="fila">
+    <label>Largo</label>
+    <input type="range" id="largo" min="5" max="100" step="5">
+    <span class="valor" id="largoValor"></span>
+  </div>
+
+  <h2>Sensibilidad del puntero</h2>
+  <div class="fila">
+    <label>Velocidad</label>
+    <input type="range" id="sens" min="10" max="80" step="1">
+    <span class="valor" id="sensValor"></span>
+  </div>
+  <div class="nota" style="margin:-2px 0 0" id="sensNota"></div>
+
+  <h2>Aspecto</h2>
+  <div class="fila">
+    <label>Color</label>
+    <div class="colores" id="muestras"></div>
+    <input type="color" id="color">
+  </div>
+  <div class="fila">
+    <label style="min-width:auto">
+      <input type="checkbox" id="siempre"> Mostrar el halo siempre
+    </label>
+  </div>
+  <div class="nota" style="margin:-4px 0 0">
+    Tenue cuando no lo usás, brillante al cruzarlo. Sirve para no tener que
+    acordarse de dónde quedó.
+  </div>
+  <div class="nota" id="nota"></div>
+</div>
+
+<!-- ============ QR ============ -->
+<div class="hoja" id="hoja-qr">
+  <div class="qr-caja">
+    <div id="marco"><img id="img" alt="Código QR"></div>
+    <div class="pasos">
+      <div class="paso"><div class="n">1</div><span>Abrí <b>PortalDroid</b> en el celular.</span></div>
+      <div class="paso"><div class="n">2</div><span>Tocá <b>Escanear código de la PC</b>.</span></div>
+      <div class="paso"><div class="n">3</div><span>Apuntá la cámara a este código.</span></div>
+    </div>
+    <div id="estado">Esperando al celular…</div>
+    <div class="nota" id="pie" style="text-align:center"></div>
+  </div>
+</div>
+
+<script>
+  const { ipcRenderer } = require('electron');
+  let estado = null;
+
+  const PALETA = ['#50c8ff', '#7ee2a8', '#ffd166', '#ff8fa3', '#c792ea', '#ffffff'];
+
+  // ---- Pestañas ----
+  for (const p of document.querySelectorAll('.pestana')) {
+    p.onclick = () => {
+      for (const q of document.querySelectorAll('.pestana')) q.classList.remove('activa');
+      for (const h of document.querySelectorAll('.hoja')) h.classList.remove('activa');
+      p.classList.add('activa');
+      document.getElementById('hoja-' + p.dataset.hoja).classList.add('activa');
+      if (estado) dibujarMapa();
+      ajustarVentana();
+    };
+  }
+
+  /**
+   * Le pide al proceso principal que la ventana mida exactamente lo que ocupa
+   * el contenido. Así no aparece la barra de desplazamiento y no hay que
+   * adivinar una altura fija que después no sirve en otra pantalla.
+   */
+  function ajustarVentana() {
+    requestAnimationFrame(() => {
+      // La caja del body mide lo que ocupa el contenido, no lo que entra en
+      // la ventana: el body no tiene alto fijo ni recorte propio, así que
+      // sirve tanto para agrandar como para achicar.
+      const alto = Math.ceil(document.body.getBoundingClientRect().height) + 24;
+      ipcRenderer.send('ajustar-ventana', { alto });
+    });
+  }
+
+  ipcRenderer.on('estado', (_e, d) => { estado = d; pintar(); });
+
+  ipcRenderer.on('qr', (_e, d) => {
+    document.getElementById('img').src = d.imagen;
+    document.getElementById('pie').innerHTML =
+      `Esta PC es <b>${d.ip}</b>. Si Windows pregunta por el firewall, ` +
+      `permitilo en redes <b>privadas</b>.`;
+    ajustarVentana();
+  });
+
+  ipcRenderer.on('conexion', (_e, d) => {
+    const caja = document.getElementById('estado');
+    caja.textContent = d.texto;
+    caja.className = d.tipo || '';
+  });
+
+  function pintar() {
+    document.documentElement.style.setProperty('--activo', estado.color);
+    dibujarMapa();
+
+    ponerBarra('pos', estado.posicion * 100, (v) => Math.round(v) + '%');
+    ponerBarra('largo', estado.largo * 100, (v) => Math.round(v) + '%');
+    // La sensibilidad se muestra como "cuántos píxeles de mouse hacen falta
+    // para cruzar la pantalla del celular": es un número que se entiende,
+    // a diferencia del 0.0025 que hay abajo.
+    ponerBarra('sens', estado.sensibilidad * 10000, () => Math.round(1 / estado.sensibilidad) + ' px');
+    document.getElementById('sensNota').textContent =
+      'Cuántos píxeles tenés que mover el mouse para recorrer la pantalla ' +
+      'del celular de punta a punta. Menos = más rápido.';
+
+    document.getElementById('color').value = estado.color;
+    document.getElementById('siempre').checked = !!estado.siempreVisible;
+    dibujarMuestras();
+
+    const p = estado.pantallas.find(x => x.elegida);
+    document.getElementById('nota').innerHTML = p
+      ? `El halo está en el <b>monitor ${p.indice + 1}</b>, borde <b>${nombreBorde(estado.borde)}</b>.`
+      : '';
+    ajustarVentana();
+  }
+
+  function ponerBarra(id, valor, formato) {
+    const el = document.getElementById(id);
+    el.value = Math.round(valor);
+    document.getElementById(id + 'Valor').textContent = formato(el.value);
+  }
+
+  function nombreBorde(b) {
+    return { right: 'derecho', left: 'izquierdo', top: 'superior', bottom: 'inferior' }[b] || b;
+  }
+
+  /**
+   * Dibuja los monitores a escala, en sus posiciones reales. Se calcula el
+   * rectángulo que los contiene a todos y se escala para que entre en la caja,
+   * así el dibujo se parece a cómo los tenés puestos de verdad. Funciona
+   * también con coordenadas negativas (un monitor a la izquierda del principal).
+   */
+  function dibujarMapa() {
+    const mapa = document.getElementById('mapa');
+    mapa.innerHTML = '';
+    const caja = mapa.getBoundingClientRect();
+    if (caja.width === 0) return;            // la pestaña está oculta
+    const pad = 16;
+    const anchoUtil = caja.width - pad * 2;
+    const altoUtil = caja.height - pad * 2;
+
+    const minX = Math.min(...estado.pantallas.map(p => p.bounds.x));
+    const minY = Math.min(...estado.pantallas.map(p => p.bounds.y));
+    const totalW = Math.max(...estado.pantallas.map(p => p.bounds.x + p.bounds.width)) - minX;
+    const totalH = Math.max(...estado.pantallas.map(p => p.bounds.y + p.bounds.height)) - minY;
+    const escala = Math.min(anchoUtil / totalW, altoUtil / totalH);
+    const offX = pad + (anchoUtil - totalW * escala) / 2;
+    const offY = pad + (altoUtil - totalH * escala) / 2;
+
+    for (const p of estado.pantallas) {
+      const d = document.createElement('div');
+      d.className = 'pantalla';
+      const w = p.bounds.width * escala, h = p.bounds.height * escala;
+      d.style.left = (offX + (p.bounds.x - minX) * escala) + 'px';
+      d.style.top = (offY + (p.bounds.y - minY) * escala) + 'px';
+      d.style.width = w + 'px';
+      d.style.height = h + 'px';
+
+      const et = document.createElement('div');
+      et.className = 'etiqueta';
+      et.innerHTML = `<b>Monitor ${p.indice + 1}</b>` +
+        `<span>${p.bounds.width} × ${p.bounds.height}</span>` +
+        (p.principal ? '<span>principal</span>' : '');
+      d.appendChild(et);
+
+      const G = 9;
+      for (const borde of ['top', 'bottom', 'left', 'right']) {
+        const f = document.createElement('div');
+        const usable = p.bordes[borde];
+        const elegido = p.elegida && estado.borde === borde;
+        f.className = 'borde' + (usable ? '' : ' bloqueado') + (elegido ? ' elegido' : '');
+        const vert = borde === 'left' || borde === 'right';
+        f.style.width = (vert ? G : Math.max(0, w - G * 2)) + 'px';
+        f.style.height = (vert ? Math.max(0, h - G * 2) : G) + 'px';
+        f.style.left = borde === 'right' ? (w - G) + 'px' : (vert ? '0' : G + 'px');
+        f.style.top = borde === 'bottom' ? (h - G) + 'px' : (vert ? G + 'px' : '0');
+        f.title = usable
+          ? 'Poner el halo en el borde ' + nombreBorde(borde)
+          : 'Da contra otro monitor: por ahí pasa el mouse de una pantalla a la otra';
+        if (usable) f.onclick = () => ipcRenderer.send('ajuste', { pantalla: p.clave, borde });
+        d.appendChild(f);
+      }
+      mapa.appendChild(d);
+    }
+  }
+
+  function dibujarMuestras() {
+    const cont = document.getElementById('muestras');
+    cont.innerHTML = '';
+    for (const c of PALETA) {
+      const m = document.createElement('div');
+      m.className = 'muestra' + (c.toLowerCase() === estado.color.toLowerCase() ? ' activa' : '');
+      m.style.background = c;
+      m.onclick = () => ipcRenderer.send('ajuste', { color: c });
+      cont.appendChild(m);
+    }
+  }
+
+  document.getElementById('pos').oninput = (e) => {
+    document.getElementById('posValor').textContent = e.target.value + '%';
+    ipcRenderer.send('ajuste', { posicion: e.target.value / 100 });
+  };
+  document.getElementById('largo').oninput = (e) => {
+    document.getElementById('largoValor').textContent = e.target.value + '%';
+    ipcRenderer.send('ajuste', { largo: e.target.value / 100 });
+  };
+  document.getElementById('sens').oninput = (e) => {
+    const s = e.target.value / 10000;
+    document.getElementById('sensValor').textContent = Math.round(1 / s) + ' px';
+    ipcRenderer.send('ajuste', { sensibilidad: s });
+  };
+  document.getElementById('color').oninput = (e) => ipcRenderer.send('ajuste', { color: e.target.value });
+  document.getElementById('siempre').onchange = (e) =>
+    ipcRenderer.send('ajuste', { siempreVisible: e.target.checked });
+</script>
+</body>
+</html>

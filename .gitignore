@@ -1,0 +1,33 @@
+# ---- Build artifacts ----
+# Cualquier carpeta build/ o .gradle/ en cualquier nivel
+**/build/
+**/.gradle/
+**/.kotlin/
+android-app/local.properties
+*.iml
+
+# ---- Node / Electron ----
+**/node_modules/
+windows-app/dist/
+
+# ---- IDE ----
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---- Configuración local ----
+# El config.json de desarrollo lleva el token de emparejamiento de la instalación.
+# En producción vive en %APPDATA%; acá se ignora para no filtrarlo.
+windows-app/config.local.json
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Nota ----
+# entregas/ SÍ se versiona a propósito: contiene el .exe y el .apk listos para
+# usar al descargar el repo como ZIP.
+
+# Logs (se regeneran en cada arranque)
+*.log

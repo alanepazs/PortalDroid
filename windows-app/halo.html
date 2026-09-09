@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+  /* La ventana es más ancha que la barra a propósito: el sobrante es el
+     espacio donde se dibuja el resplandor. #glow se pega al borde de la
+     pantalla y ocupa solo una parte del ancho; el resto queda libre. */
+  #glow {
+    position: absolute;
+    background: linear-gradient(var(--dir), var(--fuerte), var(--flojo));
+    box-shadow: 0 0 28px 8px var(--brillo);
+    /* En reposo (halo siempre visible, sin cruzar) se ve tenue y quieto:
+       tiene que marcar dónde está la puerta sin llamar la atención. Al
+       cruzar, el body pasa a .activo y ahí sí late a pleno. */
+    /* 0.30 era demasiado tenue: Alan no lo veía y creía que la opción no
+       funcionaba, cuando la ventana sí estaba visible. 0.60 se nota sin
+       molestar. */
+    opacity: 0.60;
+    transition: opacity .18s;
+  }
+  /* vertical (bordes izquierdo/derecho): barra alta y angosta */
+  #glow.vertical {
+    top: 0; bottom: 0; width: 14px;
+    border-radius: 7px;
+    /* Como la barra ya no ocupa todo el borde, las puntas se verían
+       cortadas de golpe. Este degradado las desvanece. */
+    -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0%, black 18%, black 82%, transparent 100%);
+  }
+  #glow.right  { right: 0; }
+  #glow.left   { left: 0; }
+  /* horizontal (bordes arriba/abajo): barra ancha y baja */
+  #glow.horizontal {
+    left: 0; right: 0; height: 14px;
+    border-radius: 7px;
+    -webkit-mask-image: linear-gradient(to right,
+      transparent 0%, black 18%, black 82%, transparent 100%);
+  }
+  #glow.top    { top: 0; }
+  #glow.bottom { bottom: 0; }
+
+  body.activo #glow {
+    opacity: 1;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%   { opacity: 0.55; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.55; }
+  }
+</style>
+</head>
+<body>
+  <div id="glow"></div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const edge = params.get('edge') || 'right';
+    // dirección del degradé según de qué borde sale el halo
+    const dirs = { right: 'to left', left: 'to right', top: 'to bottom', bottom: 'to top' };
+    document.documentElement.style.setProperty('--dir', dirs[edge] || 'to left');
+    const axis = (edge === 'top' || edge === 'bottom') ? 'horizontal' : 'vertical';
+    document.getElementById('glow').className = axis + ' ' + edge;
+
+    // El color viene del ajuste del usuario, en #rrggbb. Se descompone en
+    // rojo/verde/azul para poder armar las tres variantes con distinta
+    // transparencia: el degradé fuerte, el flojo y el resplandor.
+    const color = params.get('color') || '#50c8ff';
+    const n = parseInt(color.replace('#', ''), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const raiz = document.documentElement.style;
+    raiz.setProperty('--fuerte', `rgba(${r},${g},${b},0.95)`);
+    raiz.setProperty('--flojo',  `rgba(${r},${g},${b},0.05)`);
+    raiz.setProperty('--brillo', `rgba(${r},${g},${b},0.70)`);
+  </script>
+</body>
+</html>

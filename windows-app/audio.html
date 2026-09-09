@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>audio</title></head>
+<body>
+<script>
+  const { ipcRenderer } = require('electron');
+  const fs = require('fs');
+  const path = require('path');
+
+  // Por qué esto cumple con "sin frenar el audio de Windows ni cambiar la
+  // salida": no hacemos nada especial. Reproducimos como reproduce cualquier
+  // app, y Windows ya se encarga de mezclar el sonido de todos los programas
+  // en la salida que tengas puesta. No tocamos el dispositivo de salida ni
+  // pedimos acceso exclusivo.
+
+  let ctx = null;
+  let node = null;      // el reproductor continuo (audio-worklet.js)
+  let gain = null;
+  let rate = 48000;
+  let channels = 2;
+  let volume = 1;
+  let prefillMs = 100;
+  let maxMs = 400;
+  let building = false;
+  let announced = false;
+
+  async function buildGraph() {
+    if (ctx || building) return;
+    building = true;
+    try {
+      ctx = new AudioContext({ sampleRate: rate, latencyHint: 'interactive' });
+
+      // El worklet se carga leyendo el archivo y armando un Blob, en vez de
+      // pasarle la ruta directo. Chromium bloquea cargar módulos desde file://
+      // por seguridad, y un Blob esquiva ese problema sin desactivar nada.
+      const src = fs.readFileSync(path.join(__dirname, 'audio-worklet.js'), 'utf-8');
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+
+      node = new AudioWorkletNode(ctx, 'pcm-player', {
+        numberOfInputs: 0,
+        outputChannelCount: [channels],
+        processorOptions: {
+          prefillFrames: Math.round(rate * prefillMs / 1000),
+          maxFrames: Math.round(rate * maxMs / 1000),
+          channels,
+        },
+      });
+      // Los contadores del worklet: cuántas veces sobró o faltó audio.
+      node.port.onmessage = (e) => {
+        if (e.data && e.data.type === 'stats') ipcRenderer.send('tb-audio-stats', e.data);
+      };
+      gain = ctx.createGain();
+      gain.gain.value = volume;
+      node.connect(gain);
+      gain.connect(ctx.destination);
+      await ctx.resume();
+    } finally {
+      building = false;
+    }
+  }
+
+  /** PCM 16 bits intercalado (L R L R...) → un Float32Array por canal. */
+  function deinterleave(bytes) {
+    const frameBytes = channels * 2;
+    const frames = Math.floor(bytes.length / frameBytes);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const out = [];
+    for (let c = 0; c < channels; c++) out.push(new Float32Array(frames));
+    for (let i = 0; i < frames; i++) {
+      const base = i * channels * 2;
+      for (let c = 0; c < channels; c++) {
+        // Se divide por 32768 para llevar el rango -32768..32767 al -1..1
+        // que espera Web Audio.
+        out[c][i] = view.getInt16(base + c * 2, true) / 32768;
+      }
+    }
+    return out;
+  }
+
+  ipcRenderer.on('tb-audio-format', async (_e, fmt) => {
+    rate = fmt.sampleRate || 48000;
+    channels = fmt.channels || 2;
+    if (fmt.prefillMs) prefillMs = fmt.prefillMs;
+    if (fmt.maxMs) maxMs = fmt.maxMs;
+    // El sample rate de un AudioContext no se puede cambiar una vez creado,
+    // así que si cambió el formato hay que rehacer todo el grafo.
+    if (ctx) { try { await ctx.close(); } catch (_) {} }
+    ctx = null; node = null; gain = null; announced = false;
+    await buildGraph();
+  });
+
+  ipcRenderer.on('tb-audio-volume', (_e, v) => {
+    volume = v;
+    if (gain) gain.gain.value = v;
+  });
+
+  ipcRenderer.on('tb-audio-reset', () => {
+    if (node) node.port.postMessage({ type: 'reset' });
+  });
+
+  ipcRenderer.on('tb-audio-chunk', async (_e, chunk) => {
+    if (!ctx) await buildGraph();
+    if (!node) return;
+    const bytes = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+    const planar = deinterleave(bytes);
+    // Se transfieren los buffers en vez de copiarlos: cruzar al hilo de audio
+    // 20 veces por segundo copiando sería trabajo al pedo.
+    node.port.postMessage(
+      { type: 'chunk', channels: planar },
+      planar.map(a => a.buffer)
+    );
+    if (!announced) {
+      announced = true;
+      ipcRenderer.send('tb-audio-playing', { rate, channels, prefillMs, maxMs });
+    }
+  });
+</script>
+</body>
+</html>

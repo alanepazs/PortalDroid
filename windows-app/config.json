@@ -1,0 +1,23 @@
+{
+  "port": 7099,
+  "edge": "right",
+  "edgeThresholdPx": 3,
+  "dwellMs": 0,
+  "exitThresholdNorm": 0.02,
+  "sensitivity": 0.0025,
+  "entryGraceMs": 600,
+  "haloLengthFraction": 0.25,
+  "haloPosition": 1,
+  "triggerOnHaloOnly": true,
+  "edgeDebug": false,
+  "scrollDistance": 0.35,
+  "invertScroll": false,
+  "scrollMinIntervalMs": 180,
+  "keyboard": true,
+  "audio": true,
+  "audioPort": 7100,
+  "audioVolume": 1,
+  "audioBufferMs": 200,
+  "audioMaxBufferMs": 1500,
+  "audioBatchMs": 20
+}

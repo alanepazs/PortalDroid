@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PortalDroid</string>
+    <string name="accessibility_service_description">Permite que la PC simule toques reales en la pantalla (puente de mouse Windows-Android).</string>
+</resources>

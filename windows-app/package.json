@@ -1,0 +1,51 @@
+{
+  "name": "portaldroid-windows",
+  "version": "0.1.0",
+  "description": "Puente de mouse Windows-Android por WiFi con halo en el borde de pantalla",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.alan.portaldroid",
+    "productName": "PortalDroid",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "pc-server.js",
+      "monitores.js",
+      "audio-worklet.js",
+      "*.html",
+      "config.json",
+      "tray-icon.png"
+    ],
+    "asarUnpack": [
+      "**/*.node",
+      "**/node_modules/uiohook-napi/**",
+      "**/node_modules/@nut-tree-fork/**"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "PortalDroid.exe"
+    }
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.0",
+    "qrcode": "^1.5.4",
+    "uiohook-napi": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "allowScripts": {
+    "electron@31.7.7": true,
+    "uiohook-napi@1.5.5": true
+  }
+}

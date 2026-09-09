@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  /* Tiene que cubrir todo: los eventos de rueda le llegan a lo que esté
+     abajo del cursor, así que si el body no ocupa la pantalla entera,
+     la rueda no se captura. */
+  #catcher { position: fixed; inset: 0; }
+</style>
+</head>
+<body>
+<div id="catcher"></div>
+<script>
+  const { ipcRenderer } = require('electron');
+
+  // ---------------- Rueda ----------------
+  // Chromium da deltaY con signo y magnitud, respetando la configuración de
+  // scroll de Windows. uiohook, en esta máquina, devuelve rotation:0 siempre:
+  // no sabe para qué lado gira la rueda. Por eso la leemos desde acá.
+  // deltaY > 0 = rueda hacia abajo (hacia vos) = siguiente video.
+  window.addEventListener('wheel', (e) => {
+    if (e.deltaY === 0) return;
+    ipcRenderer.send('tb-wheel', { dy: e.deltaY });
+    e.preventDefault();
+  }, { passive: false });
+
+  // ---------------- Teclado ----------------
+  // Teclas que no son "una letra" y hay que mandar con nombre propio.
+  // Escape y F1/F2 mapean a los botones del sistema del Android: sirven para
+  // salir de una app en la que entraste sin querer sin tocar el celular.
+  const SPECIAL = {
+    Backspace: 'backspace',
+    Enter: 'enter',
+    Escape: 'back',
+    F1: 'home',
+    F2: 'recents',
+  };
+
+  window.addEventListener('keydown', (e) => {
+    // Los atajos de emergencia (Ctrl+Alt+W, Ctrl+Alt+Shift+Q) los agarra
+    // Electron por afuera; acá los dejamos pasar sin mandarlos al cel.
+    if (e.ctrlKey || e.metaKey) return;
+
+    if (SPECIAL[e.key]) {
+      ipcRenderer.send('tb-key', { special: SPECIAL[e.key] });
+      e.preventDefault();
+      return;
+    }
+
+    // e.key con largo 1 es un caracter imprimible de verdad, ya traducido
+    // por la distribución de teclado de Windows: la ñ sale ñ, los acentos
+    // salen acentuados. Todo lo demás (Shift, flechas, F5...) tiene nombres
+    // más largos y lo ignoramos.
+    if (e.key.length === 1) {
+      ipcRenderer.send('tb-key', { ch: e.key });
+      e.preventDefault();
+    }
+  });
+
+  // Los clics no los mandamos desde acá (de eso ya se encarga uiohook), pero
+  // sí los frenamos: si no, al hacer clic en modo teléfono el clic también le
+  // llegaría a la app de Windows que quedó abajo del cursor.
+  window.addEventListener('mousedown', (e) => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+</script>
+</body>
+</html>
