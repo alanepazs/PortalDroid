@@ -25,17 +25,30 @@ Creadores de contenido o empleados de oficina que necesiten controlar su Android
 
 ---
 
+## ⬇️ Descargar
+
+| | Archivo | Cómo se instala |
+|---|---|---|
+| **Windows** | [**PortalDroid.exe**](https://github.com/alanepazs/PortalDroid/raw/main/PortalDroid.exe) | Doble clic. Portable, no instala nada. |
+| **Android** | [**PortalDroid.apk**](https://github.com/alanepazs/PortalDroid/raw/main/PortalDroid.apk) | Copialo al celular y abrilo. |
+
+> Los dos tienen que estar en la misma red WiFi.
+> Windows puede mostrar un aviso de "editor desconocido": **Más información → Ejecutar de todas formas**.
+> Android va a pedir permiso para **instalar de fuentes desconocidas**: aceptá.
+
+---
+
 ## Empezar en 3 minutos
 
 ### 1. Instalar en Android
 
-**Descargá** `entregas/PortalDroid.apk` e instalalo (Android va a pedir permiso para instalar de fuentes desconocidas).
+Descargá **PortalDroid.apk** (arriba) y abrilo en el celular.
 
 **Primera vez:** Seguí el paso 1 → **"Permitir que controle la pantalla"** → Ajustes → Accesibilidad → Buscá **PortalDroid** y activalo.
 
 ### 2. Correr en Windows
 
-Doble clic en `entregas/PortalDroid.exe` (portable, un solo archivo, no instala nada). Vive en los **iconos ocultos** de la bandeja (la flechita ▲).
+Doble clic en **PortalDroid.exe** (portable, un solo archivo, no instala nada). Vive en los **iconos ocultos** de la bandeja (la flechita ▲).
 
 La primera vez te abre una ventana con un **código QR**. Windows te va a preguntar por el firewall—**permitilo en redes privadas** para que el celular pueda llegar a la PC.
 
