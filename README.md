@@ -1,5 +1,11 @@
 # PortalDroid — puente de Windows a Android
 
+<div align="center">
+
+**Español** · [English](README.en.md)
+
+</div>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Plataforma](https://img.shields.io/badge/plataforma-Windows%20%7C%20Android-blue)
 ![Estado](https://img.shields.io/badge/estado-estable-brightgreen)
@@ -141,27 +147,17 @@ En `%APPDATA%\portaldroid-windows\config.json`:
 
 PortalDroid funciona completamente en tu red local y no recopila, almacena ni transmite datos personales a servidores remotos.
 
-- ✓ **Sin analytics** - No hay tracking de uso
-- ✓ **Sin conexiones a Internet** - Todo funciona offline en WiFi local
-- ✓ **Sin recopilación de datos** - No se guardan locations, contactos, fotos, historial
-- ✓ **Comunicación local** - Solo tu PC y tu celular se hablan entre sí
-- ✓ **Sin servicios de terceros** - Sin Firebase, Google Cloud, Sentry, o similares
-- ✓ **Open source** - Podés auditar el código en GitHub
+- ✓ **Sin analytics** — No hay tracking de uso
+- ✓ **Sin conexiones a Internet** — Todo funciona offline en WiFi local
+- ✓ **Sin recopilación de datos** — No se guardan ubicaciones, contactos, fotos, historial
+- ✓ **Comunicación local** — Solo tu PC y tu celular se hablan entre sí
+- ✓ **Sin servicios de terceros** — Sin Firebase, Google Cloud, Sentry, o similares
+- ✓ **Open source** — Podés auditar el código en GitHub
 
 **Datos que procesa (todos locales):**
 - Coordenadas del mouse (se envían al celular, no a Internet)
 - Entrada de teclado (se procesa localmente)
 - Audio del celular (se captura y manda al PC, ambos en tu red)
-
----
-
-## Licencia
-
-Este proyecto está bajo licencia **MIT**. Eres libre de usarlo, modificarlo y distribuirlo con o sin fines de lucro.
-
-Ver [LICENSE](LICENSE) para detalles completos.
-
-**Dependencias:** Ver [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) para licencias de librerías de terceros.
 
 ---
 
@@ -182,11 +178,11 @@ Ver [LICENSE](LICENSE) para detalles completos.
 
 - Si tenés un monitor al 100% y otro al 150%, el halo puede quedar corrido
 - La app lo detecta y lo avisa en el registro, pero no está completamente resuelto
-- Pon todos los monitores al mismo escalado por ahora
+- Poné todos los monitores al mismo escalado por ahora
 
 ### Programas que corren como administrador
 
-Si usás juegos con anticheat (que corren como admin), PortalDroid no va a ver los eventos del mouse mientras tienen el foco. **Solución:** corré PortalDroid como administrador también. El acceso directo del Escritorio ya lo hace; si corres `PortalDroid.exe` a mano, botón derecho → "Ejecutar como administrador".
+Si usás juegos con anticheat (que corren como admin), PortalDroid no va a ver los eventos del mouse mientras tienen el foco. **Solución:** corré PortalDroid como administrador también. El acceso directo del Escritorio ya lo hace; si corrés `PortalDroid.exe` a mano, botón derecho → "Ejecutar como administrador".
 
 **Por qué:** Windows no entrega eventos de mouse a apps comunes mientras un programa elevado tiene el foco—es una protección del sistema.
 
@@ -221,11 +217,11 @@ adb logcat -s PortalDroid:*
 ```bash
 cd windows-app
 
-# Modo desarrollo (requiere IP del cel en config.json)
+# Modo desarrollo
 npm install
 npm start
 
-# Packaged .exe (~73 MB, portable, sin instalación)
+# Ejecutable empaquetado (~70 MB, portable, sin instalación)
 npm run build
 # Salida: dist/PortalDroid.exe
 ```
@@ -254,16 +250,16 @@ npm run build
 ### "El audio corta"
 - Subí `audioBufferMs` en config.json (empezá con 300)
 - Algunas apps (Spotify, Netflix) no dejan capturar—probá otra
-- ¿Celular cerca de un microondas? La interferencia WiFi causa gaps
+- ¿Celular cerca de un microondas? La interferencia WiFi causa cortes
 
 ### "El puntero se ve lageado"
-- Bajá `sensitivity` en config.json (default 0.0025—números más altos = más rápido)
-- Si dos monitores: verificá que ambos tengan el mismo escalado
+- Ajustá `sensitivity` en config.json (default 0.0025—números más altos = más rápido)
+- Si tenés dos monitores: verificá que ambos tengan el mismo escalado
 
 ### "Se desconecta cada rato"
 - Acercá el celular al router
-- Chequea si otra app está saturando el WiFi
-- Reinicia la app del cel e intentá de nuevo
+- Chequeá si otra app está saturando el WiFi
+- Reiniciá la app del cel e intentá de nuevo
 
 ---
 
@@ -272,7 +268,7 @@ npm run build
 **Arquitectura:**
 
 - **App de Windows** (`windows-app/`): app Electron en la bandeja del sistema. Engancha el mouse global con `uiohook-napi`, detecta el halo, abre un servidor TCP y manda comandos de toque/scroll/teclado al Android por WiFi.
-  
+
 - **Servicio de Android** (`android-app/`): Servicio de Accesibilidad que convierte los comandos TCP en gestos reales con `dispatchGesture`. También manda el audio de otras apps por TCP en tiempo real.
 
 **¿Por qué WiFi en vez de USB?** USB (scrcpy) requiere que la pantalla del cel se espeje en la PC. PortalDroid funciona con el cel mostrando su *propia* pantalla en un stand al lado, haciéndolo de verdad útil para una mano.
@@ -281,13 +277,14 @@ npm run build
 
 **La magia del mouse:** Un truco del "mouse infinito" devuelve el cursor a un punto central después de cada movimiento, así el mouse nunca se queda sin pantalla. Solo el *delta* se manda al cel y se acumula ahí.
 
+Detalle completo del protocolo TCP en [PROTOCOL.md](PROTOCOL.md).
+
 ---
 
 ## Limitaciones conocidas
 
 - **Click-and-hold:** Funciona. El click derecho no está mapeado todavía.
 - **Toques múltiples:** Solo entrada de un dedo por ahora.
-- **Sincronización offline:** La info del emparejamiento es local.
 - **Batería:** Algunos Android optimizan el proceso de fondo. Podría necesitar desactivar la optimización de batería para la app.
 
 ---
@@ -306,17 +303,16 @@ npm run build
 
 ## Licencia
 
-MIT License. Mirá [LICENSE](LICENSE) para detalles.
+Licencia **MIT**. Sos libre de usarlo, modificarlo y distribuirlo con o sin fines de lucro. Ver [LICENSE](LICENSE) para el texto completo.
+
+**Dependencias:** Ver [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) para las licencias de las librerías de terceros.
 
 ---
 
 ## Agradecimientos
 
-Construido en una semana de debugging y mediciones intensas. Cada feature (especialmente audio) pasó por varias rondas de búsqueda de edge-cases para funcionar de verdad. Si algo parece sobre-engineered, es probablemente porque se rompió tres veces antes.
-
-Gracias a Alan por las pruebas brutales y los pedidos de features que hicieron esto útil.
+Construido en una semana de debugging y mediciones intensas. Cada feature (especialmente el audio) pasó por varias rondas de búsqueda de edge-cases para funcionar de verdad. Si algo parece sobre-ingenierizado, es probablemente porque se rompió tres veces antes.
 
 ---
 
 **Testeado en:** Windows 11 Pro, Android 16, pantallas 2560×1440 + 1920×1080 al 100% de escala.
-
