@@ -3,6 +3,7 @@ package com.alan.portaldroid
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -315,10 +316,28 @@ class AudioStreamService : Service() {
                 CHANNEL_ID, "Audio hacia la PC", NotificationManager.IMPORTANCE_LOW
             )
         )
+
+        // Tocar la notificación abre la app. Sin esto no hacía nada, que es
+        // justo lo contrario de lo que uno espera: es el único cartel visible
+        // mientras el audio va, así que es el atajo natural para volver.
+        //
+        // CLEAR_TOP + SINGLE_TOP en vez de abrir otra copia: si la pantalla ya
+        // estaba abierta atrás, vuelve a esa misma y no apila una arriba.
+        val abrir = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val alTocar = PendingIntent.getActivity(
+            this, 0, abrir,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("PortalDroid")
             .setContentText("Mandando el audio del celular a la PC")
             .setSmallIcon(android.R.drawable.stat_sys_headset)
+            .setContentIntent(alTocar)
             .setOngoing(true)
             .build()
     }
