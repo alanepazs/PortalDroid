@@ -129,10 +129,24 @@ class TouchAccessibilityService : AccessibilityService() {
         val tope = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ACCESSIBILITY)
         if (tope <= 0) return
         val actual = am.getStreamVolume(android.media.AudioManager.STREAM_ACCESSIBILITY)
-        val ganancia = (actual / tope.toFloat()).coerceIn(0f, 1f)
-        if (kotlin.math.abs(ganancia - AudioStreamService.volumen) < 0.001f) return
+
+        // La posición de la barra NO se usa tal cual como ganancia.
+        //
+        // El oído no es lineal: una ganancia de 0.5 no se escucha "a la
+        // mitad", se escucha apenas más baja. Con la cuenta directa, el
+        // mínimo de esta barra (1 de 15) daba 6,7%, que son -23 dB: bajo,
+        // pero lejos de silencio, y se seguía escuchando fuerte.
+        //
+        // Elevar al cuadrado acerca la barra a cómo se percibe de verdad:
+        // el mínimo pasa a 0,4% (-47 dB, prácticamente nada), la mitad de
+        // la barra queda en 25%, y el tope sigue siendo el audio tal cual.
+        val fraccion = (actual / tope.toFloat()).coerceIn(0f, 1f)
+        val ganancia = fraccion * fraccion
+
+        if (kotlin.math.abs(ganancia - AudioStreamService.volumen) < 0.0005f) return
         AudioStreamService.setVolumen(this, ganancia)
-        Log.i(TAG, "volumen a la PC: ${Math.round(ganancia * 100)}% (barra $actual de $tope)")
+        Log.i(TAG, "volumen a la PC: ${Math.round(ganancia * 100)}% " +
+            "(barra $actual de $tope)")
     }
 
     override fun onDestroy() {
