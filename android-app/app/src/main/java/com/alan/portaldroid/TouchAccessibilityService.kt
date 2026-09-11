@@ -70,6 +70,21 @@ class TouchAccessibilityService : AccessibilityService() {
         // apenas arranca el servicio y no cuando se abre la app.
         if (Pairing.pantallaSiempreEncendida(this)) despierta?.prender()
         arrancarEnlace()
+
+        // El XML (canRequestFilterKeyEvents) alcanza en teoría, pero en
+        // algunos fabricantes (Motorola incluido) no se aplica solo: hay que
+        // pedirlo también acá, a mano, sobre el serviceInfo ya conectado.
+        // Sin esto, onKeyEvent puede no llamarse nunca y los botones de
+        // volumen se comportan como si el interceptor no existiera.
+        val info = serviceInfo
+        if (info != null) {
+            info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+            serviceInfo = info
+            Log.i(TAG, "flags del servicio tras pedir el filtro de teclas: ${info.flags}")
+        } else {
+            Log.w(TAG, "serviceInfo es null, no pude pedir el filtro de teclas")
+        }
+
         Log.i(TAG, "Servicio de accesibilidad conectado")
     }
 
@@ -106,6 +121,14 @@ class TouchAccessibilityService : AccessibilityService() {
      * ese trabajo acá.
      */
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        // Log incondicional, antes de cualquier filtro: si esto no aparece en
+        // el registro al apretar un botón físico, el problema es que Android
+        // ni siquiera nos está mandando el evento (permiso/fabricante), no
+        // algo de la lógica de acá abajo. Si aparece pero vuelve `false`,
+        // el problema está en el gateo (audio apagado, tecla distinta, etc).
+        Log.i(TAG, "onKeyEvent: code=${event.keyCode} action=${event.action} " +
+            "audioCorriendo=${AudioStreamService.running}")
+
         if (event.action != KeyEvent.ACTION_DOWN) return false
         if (!AudioStreamService.running) return false
         val paso = 0.1f
@@ -117,6 +140,7 @@ class TouchAccessibilityService : AccessibilityService() {
         val nuevo = (AudioStreamService.volumen + delta).coerceIn(0f, 2f)
         AudioStreamService.setVolumen(this, nuevo)
         volumeOverlay?.mostrar(Math.round(nuevo * 100))
+        Log.i(TAG, "volumen enviado ajustado a ${Math.round(nuevo * 100)}%")
         return true
     }
 
