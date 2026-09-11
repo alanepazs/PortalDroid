@@ -165,7 +165,8 @@ PortalDroid funciona completamente en tu red local y no recopila, almacena ni tr
 
 ### Audio
 
-- **Vas a escuchar el audio doble**—por el cel y por el parlante de la PC (Android no permite silenciar el cel mientras captura). Bajale el volumen al cel. Ojo: **bajarlo NO baja** lo que se escucha en la PC, porque la captura toma el audio antes del control de volumen.
+- **Vas a escuchar el audio doble**—por el cel y por el parlante de la PC (Android no permite silenciar el cel mientras captura). Ojo: **bajarle el volumen al celular NO baja** lo que se escucha en la PC, porque la captura toma el audio antes del control de volumen del sistema.
+- **Para eso hay un control aparte.** En la app del celular, la tarjeta "Volumen enviado a la PC" sube o baja el audio que se manda, independiente del volumen del cel y del de Windows. Se aplica al toque, sin reiniciar la transmisión.
 - **Algunas apps no dejan capturar su audio** (Spotify y Netflix se niegan). TikTok sí deja.
 
 ### Teclado

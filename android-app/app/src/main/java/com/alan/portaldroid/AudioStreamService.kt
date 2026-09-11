@@ -64,6 +64,26 @@ class AudioStreamService : Service() {
 
         @Volatile var running = false
             private set
+
+        /**
+         * Ganancia aplicada al audio ANTES de mandarlo, 0.0 a 2.0. Es la que
+         * controla el usuario desde la pantalla de la app (ver MainActivity).
+         *
+         * Por qué existe: bajar el volumen DEL CELULAR no cambia nada de lo
+         * que llega a la PC, porque AudioPlaybackCapture toma el audio antes
+         * del control de volumen del sistema (ver comentario de la clase).
+         * Esta es la única perilla que de verdad afecta lo que escucha la PC.
+         *
+         * Se lee al arrancar la transmisión y se puede cambiar en caliente
+         * mientras está sonando: el hilo de envío la relee en cada bloque.
+         */
+        @Volatile var volumen = 1f
+
+        /** Cambia la ganancia y la guarda, para la próxima vez que se abra la app. */
+        fun setVolumen(ctx: android.content.Context, valor: Float) {
+            volumen = valor.coerceIn(0f, 2f)
+            Pairing.guardarVolumenEnviado(ctx, volumen)
+        }
     }
 
     private var projection: MediaProjection? = null
@@ -126,6 +146,10 @@ class AudioStreamService : Service() {
 
         alive = true
         running = true
+        // Por si se cerró el proceso desde la última vez: releer lo que el
+        // usuario dejó guardado. Si sigue vivo, `volumen` ya tiene lo último
+        // que se tocó en la pantalla y esto no cambia nada.
+        volumen = Pairing.leerVolumenEnviado(applicationContext)
         startCapture(proj)
         arrancarEnvio()
         Log.i(TAG, "audio: capturando y mandando a la PC")
@@ -232,7 +256,10 @@ class AudioStreamService : Service() {
                     while (alive) {
                         val rec = record ?: break
                         val n = rec.read(buf, 0, buf.size)
-                        if (n > 0) out.write(buf, 0, n) else if (n < 0) break
+                        if (n > 0) {
+                            aplicarGanancia(buf, n, volumen)
+                            out.write(buf, 0, n)
+                        } else if (n < 0) break
                     }
                     // Si llegamos acá, la PC cortó: se reinicia el reloj de
                     // paciencia sólo cuando SÍ hubo conexión.
@@ -256,6 +283,29 @@ class AudioStreamService : Service() {
             }
             Log.i(TAG, "audio: envío detenido")
         }.apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Multiplica cada muestra del bloque por `ganancia`, en el lugar.
+     *
+     * PCM 16 bits con signo, little endian, L y R intercalados: cada muestra
+     * son 2 bytes. Se recorta a los límites de un short para no desbordar y
+     * volverse ruido si la ganancia es mayor a 1.
+     *
+     * En 1.0 no hace nada: es el caso normal y correr un loop por gusto en
+     * cada bloque de audio (100 veces por segundo) sería desperdiciar el hilo
+     * de prioridad urgente que tanto costó conseguir.
+     */
+    private fun aplicarGanancia(buf: ByteArray, n: Int, ganancia: Float) {
+        if (ganancia == 1f) return
+        var i = 0
+        while (i + 1 < n) {
+            val muestra = (buf[i + 1].toInt() shl 8) or (buf[i].toInt() and 0xFF)
+            val escalada = (muestra * ganancia).toInt().coerceIn(-32768, 32767)
+            buf[i] = escalada.toByte()
+            buf[i + 1] = (escalada shr 8).toByte()
+            i += 2
+        }
     }
 
     private fun buildNotification(): Notification {

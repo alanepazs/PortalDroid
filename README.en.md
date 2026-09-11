@@ -165,7 +165,8 @@ PortalDroid runs entirely on your local network and does not collect, store or s
 
 ### Audio
 
-- **You'll hear the audio twice**—from the phone and from the PC speakers (Android won't let the phone mute itself while capturing). Turn the phone's volume down. Note: **turning it down does NOT lower** what you hear on the PC, because the capture takes the audio before the volume control.
+- **You'll hear the audio twice**—from the phone and from the PC speakers (Android won't let the phone mute itself while capturing). Note: **turning the phone's own volume down does NOT lower** what you hear on the PC, because the capture takes the audio before the system's volume control.
+- **There's a separate control for that.** In the phone app, the "Volume sent to the PC" card raises or lowers the audio that gets sent, independent of the phone's volume and Windows'. It applies live, no need to restart the stream.
 - **Some apps don't allow their audio to be captured** (Spotify and Netflix refuse). TikTok does allow it.
 
 ### Keyboard

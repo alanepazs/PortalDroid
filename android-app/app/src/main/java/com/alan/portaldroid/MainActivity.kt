@@ -16,6 +16,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -139,14 +140,17 @@ class MainActivity : AppCompatActivity() {
         pasoEmparejar = Tarjeta(2, "Emparejar con tu PC")
         pasoAudio = Tarjeta(3, "Escuchar el celular en la PC")
         pasoPantalla = Tarjeta(4, "Que la pantalla no se apague")
-        for (t in listOf(pasoAccesibilidad, pasoEmparejar, pasoAudio, pasoPantalla)) {
-            raiz.addView(t.caja, anchoCompleto(dp(12)))
-        }
+        raiz.addView(pasoAccesibilidad.caja, anchoCompleto(dp(12)))
+        raiz.addView(pasoEmparejar.caja, anchoCompleto(dp(12)))
+        raiz.addView(pasoAudio.caja, anchoCompleto(dp(12)))
+        raiz.addView(controlVolumen(), anchoCompleto(dp(12)))
+        raiz.addView(pasoPantalla.caja, anchoCompleto(dp(12)))
 
         val ayuda = TextView(this)
         ayuda.text = "El audio sale también por el parlante del celular. Si molesta " +
                 "escuchar doble, bajale el volumen al celular: en la PC se sigue " +
-                "escuchando igual de fuerte."
+                "escuchando igual de fuerte. Para eso está el control de volumen " +
+                "enviado de arriba, que sí cambia lo que le llega a la PC."
         ayuda.textSize = 12f
         ayuda.setTextColor(SUAVE)
         ayuda.setPadding(dp(4), dp(22), dp(4), 0)
@@ -154,6 +158,69 @@ class MainActivity : AppCompatActivity() {
 
         scroll.addView(raiz)
         setContentView(scroll)
+    }
+
+    /**
+     * Tarjeta con la perilla de "volumen enviado a la PC".
+     *
+     * No es lo mismo que el volumen del celular: bajar el volumen del cel NO
+     * cambia nada de lo que llega a la PC, porque la captura toma el audio
+     * antes del control de volumen del sistema (ver AudioStreamService). Esta
+     * perilla sí lo cambia, porque escala las muestras antes de mandarlas.
+     *
+     * Se guarda en disco y se aplica al toque, sin hacer falta reiniciar la
+     * transmisión: el hilo de envío relee `AudioStreamService.volumen` en
+     * cada bloque de audio.
+     */
+    private fun controlVolumen(): View {
+        val caja = LinearLayout(this)
+        caja.orientation = LinearLayout.VERTICAL
+        caja.setPadding(dp(18), dp(16), dp(18), dp(16))
+        caja.background = fondoRedondo(TARJETA)
+
+        val fila = LinearLayout(this)
+        fila.orientation = LinearLayout.HORIZONTAL
+        val titulo = TextView(this)
+        titulo.text = "Volumen enviado a la PC"
+        titulo.textSize = 16f
+        titulo.setTextColor(TEXTO)
+        titulo.layoutParams =
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        fila.addView(titulo)
+
+        val valorTexto = TextView(this)
+        valorTexto.textSize = 16f
+        valorTexto.setTextColor(CELESTE)
+        fila.addView(valorTexto)
+        caja.addView(fila)
+
+        val detalle = TextView(this)
+        detalle.text = "Sube o baja el audio que le llega a la PC. No afecta el " +
+                "parlante del celular ni necesita reiniciar la transmisión."
+        detalle.textSize = 13f
+        detalle.setTextColor(SUAVE)
+        detalle.setPadding(0, dp(5), 0, dp(8))
+        caja.addView(detalle)
+
+        val barra = SeekBar(this)
+        // 0% a 200%: 100 es el audio tal cual viene, sin ganancia. Con más de
+        // 100 se puede sobrepasar el rango de un short; aplicarGanancia() lo
+        // recorta para que no se convierta en ruido.
+        barra.max = 200
+        val inicial = (Pairing.leerVolumenEnviado(this) * 100).toInt().coerceIn(0, 200)
+        barra.progress = inicial
+        valorTexto.text = "$inicial%"
+        barra.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, valor: Int, desdeUsuario: Boolean) {
+                valorTexto.text = "$valor%"
+                if (desdeUsuario) AudioStreamService.setVolumen(this@MainActivity, valor / 100f)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+        caja.addView(barra)
+
+        return caja
     }
 
     private fun anchoCompleto(margenArriba: Int) =

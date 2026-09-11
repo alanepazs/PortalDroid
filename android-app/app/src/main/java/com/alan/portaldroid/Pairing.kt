@@ -71,6 +71,25 @@ data class Pairing(
                 .edit().putBoolean(KEY_DESPIERTA, valor).apply()
         }
 
+        private const val KEY_VOLUMEN = "volumenEnviado"
+
+        /**
+         * Ganancia aplicada al audio ANTES de mandarlo a la PC. 1.0 = tal cual.
+         *
+         * Es distinta del volumen del celular: bajar el volumen del cel NO baja
+         * lo que le llega a la PC porque la captura toma el audio antes del
+         * control de volumen del sistema (ver AudioStreamService). Esta es la
+         * única perilla que sí afecta lo que escucha la PC desde el celular.
+         */
+        fun leerVolumenEnviado(ctx: Context): Float =
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getFloat(KEY_VOLUMEN, 1f)
+
+        fun guardarVolumenEnviado(ctx: Context, valor: Float) {
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putFloat(KEY_VOLUMEN, valor).apply()
+        }
+
         fun borrar(ctx: Context) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(KEY).apply()
