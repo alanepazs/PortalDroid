@@ -18,6 +18,6 @@
   "audioPort": 7100,
   "audioVolume": 1,
   "audioBufferMs": 200,
-  "audioMaxBufferMs": 1500,
+  "audioMaxBufferMs": 600,
   "audioBatchMs": 20
 }

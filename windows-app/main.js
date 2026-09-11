@@ -235,9 +235,15 @@ const AUDIO_PORT = config.audioPort ?? 7100;
 // celular. 200 es el punto donde quedó: si vuelve a cortar hay que subirlo,
 // y si el desfase molesta, bajarlo. Medir con las líneas [red] antes de mover.
 const AUDIO_PREFILL_MS = config.audioBufferMs ?? 200;
-// Techo de seguridad. Con la lectura a velocidad variable casi nunca se llega:
-// el retraso vuelve solo al objetivo mucho antes.
-const AUDIO_MAX_MS = config.audioMaxBufferMs ?? 1500;
+// Techo del retraso: pasado esto se tira lo más viejo y se vuelve al objetivo.
+//
+// Estaba en 1500 ms, pero ese número nunca se probó de verdad porque el techo
+// no estaba conectado en el worklet (ver audio-worklet.js). Con el control ya
+// funcionando, 1500 ms es demasiado: es un segundo y medio de desfase antes de
+// que algo reaccione. 600 es el triple del objetivo, así que aguanta los
+// baches normales del WiFi sin tirar nada, y corta antes de que el retraso se
+// vuelva molesto.
+const AUDIO_MAX_MS = config.audioMaxBufferMs ?? 600;
 // Cuánto audio se junta antes de pasarlo a la ventana que lo reproduce.
 // Es retraso puro: cuanto más chico, menos desfase.
 const IPC_BATCH_MS = config.audioBatchMs ?? 20;

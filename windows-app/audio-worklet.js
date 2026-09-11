@@ -94,10 +94,28 @@ class PcmPlayer extends AudioWorkletProcessor {
     this.w = (this.w + n) % this.cap;
     this.hay += n;
 
-    // Si se desbordó (nunca debería con la velocidad variable, pero por las
-    // dudas), lo más viejo quedó pisado: adelantamos la lectura.
-    if (this.hay > this.cap - 1) {
-      const exceso = this.hay - (this.cap - 1);
+    // Techo del retraso.
+    //
+    // Este control existía desde el principio (this.max) pero nunca se
+    // comparaba contra nada: lo único que recortaba era el desborde del
+    // anillo, que son 4 segundos. Resultado: el retraso podía crecer hasta
+    // varios segundos sin que nada reaccionara. Se vio midiendo: la cola
+    // pasó de 198 ms a 797 ms en media hora y siguió subiendo.
+    //
+    // Por qué crece: el WiFi no entrega parejo. Llega el 100% del audio
+    // esperado, pero a los tirones — baches de 40 a 170 ms y después una
+    // ráfaga que entra de golpe. Cada ráfaga deja la cola más alta, y leer
+    // 2% más rápido (lo máximo que se puede sin que se note el tono) tarda
+    // ~15 segundos en drenar 300 ms. Si los baches vienen más seguido que
+    // eso, el retraso sube en escalera y no baja nunca.
+    //
+    // Acá se corta: pasado el techo se tira lo más viejo y se vuelve al
+    // objetivo de una. Es un salto de audio, sí, pero uno cada tanto es
+    // mucho menos molesto que medio segundo de retraso permanente. Los
+    // desvíos chicos los sigue corrigiendo la velocidad variable, sin
+    // tirar nada y sin que se note.
+    if (this.hay > this.max) {
+      const exceso = this.hay - this.objetivo;
       this.r = (this.r + exceso) % this.cap;
       this.hay -= exceso;
       this.framesTirados += exceso;
