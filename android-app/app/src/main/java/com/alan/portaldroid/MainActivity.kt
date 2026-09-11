@@ -155,9 +155,9 @@ class MainActivity : AppCompatActivity() {
         val ayuda = TextView(this)
         ayuda.text = "El audio sale también por el parlante del celular. Si molesta " +
                 "escuchar doble, bajá el volumen del parlante de arriba: la PC lo " +
-                "sigue escuchando igual de fuerte. Y mientras mandás el audio, los " +
-                "botones físicos de volumen ya no tocan el parlante: suben o bajan " +
-                "lo que le llega a la PC."
+                "sigue escuchando igual de fuerte. Para el volumen que va a la PC, " +
+                "abrí el panel de volumen del celular: además de la barra del " +
+                "parlante vas a ver la de accesibilidad, que es esa."
         ayuda.textSize = 12f
         ayuda.setTextColor(SUAVE)
         ayuda.setPadding(dp(4), dp(22), dp(4), 0)

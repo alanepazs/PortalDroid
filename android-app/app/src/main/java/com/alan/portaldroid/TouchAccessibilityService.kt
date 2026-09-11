@@ -8,7 +8,6 @@ import android.graphics.Path
 import android.graphics.Point
 import android.os.Bundle
 import android.util.Log
-import android.view.KeyEvent
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -53,7 +52,6 @@ class TouchAccessibilityService : AccessibilityService() {
     /** Mantiene la pantalla encendida si el usuario lo pidió. */
     var despierta: MantenerDespierta? = null
         private set
-    private var volumeOverlay: VolumeOverlay? = null
 
     // Trazo en curso (mientras el "dedo" está apoyado)
     private var currentStroke: StrokeDescription? = null
@@ -65,27 +63,76 @@ class TouchAccessibilityService : AccessibilityService() {
         instance = this
         pointer = PointerOverlay(this)
         despierta = MantenerDespierta(this)
-        volumeOverlay = VolumeOverlay(this)
         // La preferencia sobrevive a reiniciar el celular, así que se aplica
         // apenas arranca el servicio y no cuando se abre la app.
         if (Pairing.pantallaSiempreEncendida(this)) despierta?.prender()
         arrancarEnlace()
 
-        // El XML (canRequestFilterKeyEvents) alcanza en teoría, pero en
-        // algunos fabricantes (Motorola incluido) no se aplica solo: hay que
-        // pedirlo también acá, a mano, sobre el serviceInfo ya conectado.
-        // Sin esto, onKeyEvent puede no llamarse nunca y los botones de
-        // volumen se comportan como si el interceptor no existiera.
+        // Pedirle a Android que muestre la barra de "volumen de accesibilidad"
+        // en SU PROPIO panel de volumen, al lado de la del parlante.
+        //
+        // Antes esto se hacía interceptando los botones y dibujando un
+        // medidor propio. Quedó mal por dos razones: era un medidor más para
+        // aprender, y consumir la tecla mata la repetición automática de
+        // Android, así que mantener apretado el botón no hacía nada.
+        //
+        // Con esta bandera el trabajo lo hace el sistema: aparece una barra
+        // más en el panel de siempre, se arrastra como cualquier otra, y los
+        // botones físicos la mueven con su repetición normal. Nosotros sólo
+        // leemos dónde quedó (ver observadorVolumen) y lo usamos de ganancia.
         val info = serviceInfo
         if (info != null) {
-            info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+            info.flags = info.flags or
+                android.accessibilityservice.AccessibilityServiceInfo.FLAG_ENABLE_ACCESSIBILITY_VOLUME
             serviceInfo = info
-            Log.i(TAG, "flags del servicio tras pedir el filtro de teclas: ${info.flags}")
+            Log.i(TAG, "flags del servicio tras pedir la barra de volumen: ${info.flags}")
         } else {
-            Log.w(TAG, "serviceInfo es null, no pude pedir el filtro de teclas")
+            Log.w(TAG, "serviceInfo es null, no pude pedir la barra de volumen")
         }
 
+        // El volumen puede cambiar desde el panel, desde los botones o desde
+        // otra app. Un observador sobre los ajustes avisa de todas por igual.
+        contentResolver.registerContentObserver(
+            android.provider.Settings.System.CONTENT_URI, true, observadorVolumen
+        )
+        aplicarVolumenDeAccesibilidad()
+
         Log.i(TAG, "Servicio de accesibilidad conectado")
+    }
+
+    /**
+     * Avisa cuando cambia cualquier volumen del sistema.
+     *
+     * Se mira el ajuste entero y no sólo el stream de accesibilidad porque
+     * Android no publica un aviso específico por stream que sea público y
+     * estable. Releer dos enteros cuando el usuario mueve un volumen es
+     * barato de sobra.
+     */
+    private val observadorVolumen = object : android.database.ContentObserver(
+        android.os.Handler(android.os.Looper.getMainLooper())
+    ) {
+        override fun onChange(selfChange: Boolean) {
+            aplicarVolumenDeAccesibilidad()
+        }
+    }
+
+    /**
+     * Pasa la barra de accesibilidad del sistema a la ganancia del audio que
+     * va a la PC.
+     *
+     * En este celular el stream va de 1 a 15, así que el mínimo no llega a
+     * silencio del todo: es como lo define Android, no algo que podamos
+     * cambiar desde acá.
+     */
+    private fun aplicarVolumenDeAccesibilidad() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+        val tope = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ACCESSIBILITY)
+        if (tope <= 0) return
+        val actual = am.getStreamVolume(android.media.AudioManager.STREAM_ACCESSIBILITY)
+        val ganancia = (actual / tope.toFloat()).coerceIn(0f, 1f)
+        if (kotlin.math.abs(ganancia - AudioStreamService.volumen) < 0.001f) return
+        AudioStreamService.setVolumen(this, ganancia)
+        Log.i(TAG, "volumen a la PC: ${Math.round(ganancia * 100)}% (barra $actual de $tope)")
     }
 
     override fun onDestroy() {
@@ -96,53 +143,12 @@ class TouchAccessibilityService : AccessibilityService() {
         pointer = null
         despierta?.apagar()
         despierta = null
-        volumeOverlay?.destruir()
-        volumeOverlay = null
+        try { contentResolver.unregisterContentObserver(observadorVolumen) } catch (_: Exception) {}
         instance = null
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
-
-    /**
-     * Botones físicos de volumen: mientras se está mandando audio a la PC,
-     * en vez de subir o bajar el parlante del celular, suben o bajan lo que
-     * le llega a la PC.
-     *
-     * Por qué sólo mientras hay audio en marcha: fuera de ese momento no hay
-     * "volumen enviado a la PC" que ajustar, y los botones tienen que seguir
-     * sirviendo para lo de siempre (el parlante). No queremos secuestrar el
-     * volumen del celular todo el tiempo por tener el servicio activado.
-     *
-     * Hace falta `android:canRequestFilterKeyEvents="true"` en
-     * accessibility_service_config.xml para que estos eventos lleguen antes
-     * que al sistema. Devolver `true` los consume: Android ya no cambia el
-     * volumen real ni muestra su propio cartel, por eso VolumeOverlay hace
-     * ese trabajo acá.
-     */
-    override fun onKeyEvent(event: KeyEvent): Boolean {
-        // Log incondicional, antes de cualquier filtro: si esto no aparece en
-        // el registro al apretar un botón físico, el problema es que Android
-        // ni siquiera nos está mandando el evento (permiso/fabricante), no
-        // algo de la lógica de acá abajo. Si aparece pero vuelve `false`,
-        // el problema está en el gateo (audio apagado, tecla distinta, etc).
-        Log.i(TAG, "onKeyEvent: code=${event.keyCode} action=${event.action} " +
-            "audioCorriendo=${AudioStreamService.running}")
-
-        if (event.action != KeyEvent.ACTION_DOWN) return false
-        if (!AudioStreamService.running) return false
-        val paso = 0.1f
-        val delta = when (event.keyCode) {
-            KeyEvent.KEYCODE_VOLUME_UP -> paso
-            KeyEvent.KEYCODE_VOLUME_DOWN -> -paso
-            else -> return false
-        }
-        val nuevo = (AudioStreamService.volumen + delta).coerceIn(0f, 2f)
-        AudioStreamService.setVolumen(this, nuevo)
-        volumeOverlay?.mostrar(Math.round(nuevo * 100))
-        Log.i(TAG, "volumen enviado ajustado a ${Math.round(nuevo * 100)}%")
-        return true
-    }
 
     // El tamaño de pantalla se preguntaba en CADA comando. Eso es una consulta
     // al proceso del sistema, 60 veces por segundo, para un dato que no cambia
