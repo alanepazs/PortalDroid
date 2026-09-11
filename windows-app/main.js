@@ -1115,6 +1115,14 @@ app.whenReady().then(() => {
   createKeyWindow();
   ipcMain.on('tb-wheel', (_evt, payload) => onWheelFromWindow(payload));
 
+  // Pedido desde la pestaña de QR: redibujarlo con la IP actual. Hace falta
+  // porque el QR se arma una sola vez al abrir la ventana; si el DHCP le dio
+  // otra IP a la PC después (por ejemplo, reconectaste el WiFi), el código
+  // que se ve queda apuntando a una dirección vieja y el celular no la
+  // encuentra más, aunque siga emparejado. No cambia la clave: sólo
+  // recalcula IP y vuelve a dibujar el mismo QR de siempre.
+  ipcMain.on('refrescar-qr', () => mandarQR());
+
   // La ventana mide su propio contenido y pide el alto que necesita. Así no
   // queda una barra de desplazamiento ni hay que adivinar una altura fija que
   // después no sirve en otra pantalla o con otra cantidad de monitores.

@@ -121,6 +121,13 @@
   }
   #estado.ok { background: #10331f; color: var(--verde); }
   #estado.mal { background: #3a1d1d; color: var(--rojo); }
+  .actualizar {
+    background: none; border: none; color: var(--suave); font-size: 12px;
+    cursor: pointer; display: flex; align-items: center; gap: 5px; padding: 2px 4px;
+  }
+  .actualizar:hover { color: var(--activo); }
+  .actualizar .icono { display: inline-block; transition: transform .4s; }
+  .actualizar.girando .icono { transform: rotate(360deg); }
 </style>
 </head>
 <body>
@@ -181,6 +188,9 @@
 <div class="hoja" id="hoja-qr">
   <div class="qr-caja">
     <div id="marco"><img id="img" alt="Código QR"></div>
+    <button class="actualizar" id="btnActualizarQR">
+      <span class="icono">↻</span> Actualizar código QR
+    </button>
     <div class="pasos">
       <div class="paso"><div class="n">1</div><span>Abrí <b>PortalDroid</b> en el celular.</span></div>
       <div class="paso"><div class="n">2</div><span>Tocá <b>Escanear código de la PC</b>.</span></div>
@@ -233,6 +243,21 @@
       `permitilo en redes <b>privadas</b>.`;
     ajustarVentana();
   });
+
+  /**
+   * Redibuja el QR con la IP actual de la PC.
+   *
+   * Hace falta si el celular dice "emparejado pero no lo encuentro": suele
+   * ser porque el DHCP le dio otra IP a la PC desde que se abrió esta
+   * ventana, y el código que se ve acá quedó apuntando a la vieja. No hace
+   * falta cerrar y volver a abrir el programa para esto.
+   */
+  document.getElementById('btnActualizarQR').onclick = (e) => {
+    ipcRenderer.send('refrescar-qr');
+    const boton = e.currentTarget;
+    boton.classList.add('girando');
+    setTimeout(() => boton.classList.remove('girando'), 400);
+  };
 
   ipcRenderer.on('conexion', (_e, d) => {
     const caja = document.getElementById('estado');

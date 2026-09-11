@@ -17,6 +17,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- El servicio en primer plano necesita mostrar una notificación. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Para pedirle al usuario que saque la app de la optimización de
+         batería. Sin esto, algunos Android (Motorola entre ellos) matan el
+         Servicio de Accesibilidad apenas la app pasa un rato en segundo
+         plano, y hay que reactivarlo a mano en Ajustes cada vez. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"

@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.Point
 import android.os.Bundle
 import android.util.Log
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -52,6 +53,7 @@ class TouchAccessibilityService : AccessibilityService() {
     /** Mantiene la pantalla encendida si el usuario lo pidió. */
     var despierta: MantenerDespierta? = null
         private set
+    private var volumeOverlay: VolumeOverlay? = null
 
     // Trazo en curso (mientras el "dedo" está apoyado)
     private var currentStroke: StrokeDescription? = null
@@ -63,6 +65,7 @@ class TouchAccessibilityService : AccessibilityService() {
         instance = this
         pointer = PointerOverlay(this)
         despierta = MantenerDespierta(this)
+        volumeOverlay = VolumeOverlay(this)
         // La preferencia sobrevive a reiniciar el celular, así que se aplica
         // apenas arranca el servicio y no cuando se abre la app.
         if (Pairing.pantallaSiempreEncendida(this)) despierta?.prender()
@@ -78,11 +81,44 @@ class TouchAccessibilityService : AccessibilityService() {
         pointer = null
         despierta?.apagar()
         despierta = null
+        volumeOverlay?.destruir()
+        volumeOverlay = null
         instance = null
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
+
+    /**
+     * Botones físicos de volumen: mientras se está mandando audio a la PC,
+     * en vez de subir o bajar el parlante del celular, suben o bajan lo que
+     * le llega a la PC.
+     *
+     * Por qué sólo mientras hay audio en marcha: fuera de ese momento no hay
+     * "volumen enviado a la PC" que ajustar, y los botones tienen que seguir
+     * sirviendo para lo de siempre (el parlante). No queremos secuestrar el
+     * volumen del celular todo el tiempo por tener el servicio activado.
+     *
+     * Hace falta `android:canRequestFilterKeyEvents="true"` en
+     * accessibility_service_config.xml para que estos eventos lleguen antes
+     * que al sistema. Devolver `true` los consume: Android ya no cambia el
+     * volumen real ni muestra su propio cartel, por eso VolumeOverlay hace
+     * ese trabajo acá.
+     */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        if (!AudioStreamService.running) return false
+        val paso = 0.1f
+        val delta = when (event.keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> paso
+            KeyEvent.KEYCODE_VOLUME_DOWN -> -paso
+            else -> return false
+        }
+        val nuevo = (AudioStreamService.volumen + delta).coerceIn(0f, 2f)
+        AudioStreamService.setVolumen(this, nuevo)
+        volumeOverlay?.mostrar(Math.round(nuevo * 100))
+        return true
+    }
 
     // El tamaño de pantalla se preguntaba en CADA comando. Eso es una consulta
     // al proceso del sistema, 60 veces por segundo, para un dato que no cambia

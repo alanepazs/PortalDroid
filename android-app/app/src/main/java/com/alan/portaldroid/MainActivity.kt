@@ -6,8 +6,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -44,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pasoEmparejar: Tarjeta
     private lateinit var pasoAudio: Tarjeta
     private lateinit var pasoPantalla: Tarjeta
+    private lateinit var tarjetaBateria: View
 
     private val FONDO = Color.parseColor("#12151A")
     private val TARJETA = Color.parseColor("#1C2027")
@@ -141,16 +145,19 @@ class MainActivity : AppCompatActivity() {
         pasoAudio = Tarjeta(3, "Escuchar el celular en la PC")
         pasoPantalla = Tarjeta(4, "Que la pantalla no se apague")
         raiz.addView(pasoAccesibilidad.caja, anchoCompleto(dp(12)))
+        tarjetaBateria = controlBateria()
+        raiz.addView(tarjetaBateria, anchoCompleto(dp(12)))
         raiz.addView(pasoEmparejar.caja, anchoCompleto(dp(12)))
         raiz.addView(pasoAudio.caja, anchoCompleto(dp(12)))
-        raiz.addView(controlVolumen(), anchoCompleto(dp(12)))
+        raiz.addView(controlParlante(), anchoCompleto(dp(12)))
         raiz.addView(pasoPantalla.caja, anchoCompleto(dp(12)))
 
         val ayuda = TextView(this)
         ayuda.text = "El audio sale también por el parlante del celular. Si molesta " +
-                "escuchar doble, bajale el volumen al celular: en la PC se sigue " +
-                "escuchando igual de fuerte. Para eso está el control de volumen " +
-                "enviado de arriba, que sí cambia lo que le llega a la PC."
+                "escuchar doble, bajá el volumen del parlante de arriba: la PC lo " +
+                "sigue escuchando igual de fuerte. Y mientras mandás el audio, los " +
+                "botones físicos de volumen ya no tocan el parlante: suben o bajan " +
+                "lo que le llega a la PC."
         ayuda.textSize = 12f
         ayuda.setTextColor(SUAVE)
         ayuda.setPadding(dp(4), dp(22), dp(4), 0)
@@ -160,28 +167,97 @@ class MainActivity : AppCompatActivity() {
         setContentView(scroll)
     }
 
+    /** ¿Android ya dejó a esta app afuera de su optimización de batería? */
+    private fun sinOptimizacionDeBateria(): Boolean {
+        val pm = getSystemService(POWER_SERVICE) as? PowerManager ?: return true
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
     /**
-     * Tarjeta con la perilla de "volumen enviado a la PC".
+     * Tarjeta que pide sacar la app de la optimización de batería.
      *
-     * No es lo mismo que el volumen del celular: bajar el volumen del cel NO
-     * cambia nada de lo que llega a la PC, porque la captura toma el audio
-     * antes del control de volumen del sistema (ver AudioStreamService). Esta
-     * perilla sí lo cambia, porque escala las muestras antes de mandarlas.
+     * Por qué hace falta: algunos Android (Motorola entre ellos) matan el
+     * proceso de la app apenas pasa un rato en segundo plano, aunque el
+     * Servicio de Accesibilidad siga marcado como activado en Ajustes. El
+     * síntoma es justo lo que ve el usuario: "emparejado pero no lo
+     * encuentro" en el celular mientras la PC todavía cree estar conectada, y
+     * la pantalla vuelve a pedir el permiso de accesibilidad aunque nunca se
+     * desactivó a mano. Sacando la app de la optimización, Android dejar de
+     * matarla y el servicio sobrevive en segundo plano.
      *
-     * Se guarda en disco y se aplica al toque, sin hacer falta reiniciar la
-     * transmisión: el hilo de envío relee `AudioStreamService.volumen` en
-     * cada bloque de audio.
+     * Sólo se muestra si hace falta: una vez concedido, `refrescar()` la
+     * esconde sola.
      */
-    private fun controlVolumen(): View {
+    private fun controlBateria(): View {
         val caja = LinearLayout(this)
         caja.orientation = LinearLayout.VERTICAL
         caja.setPadding(dp(18), dp(16), dp(18), dp(16))
         caja.background = fondoRedondo(TARJETA)
 
+        val titulo = TextView(this)
+        titulo.text = "Evitar que Android mate la app"
+        titulo.textSize = 16f
+        titulo.setTextColor(TEXTO)
+        caja.addView(titulo)
+
+        val detalle = TextView(this)
+        detalle.text = "Algunos celulares apagan solos el servicio si pasa un rato en " +
+                "segundo plano, y hay que reactivarlo a mano. Sacando la app de la " +
+                "optimización de batería, Android la deja tranquila."
+        detalle.textSize = 13f
+        detalle.setTextColor(SUAVE)
+        detalle.setPadding(0, dp(5), 0, dp(10))
+        caja.addView(detalle)
+
+        val boton = Button(this)
+        boton.text = "Sacar la optimización de batería"
+        boton.setOnClickListener {
+            val intent = Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:$packageName")
+            )
+            try { startActivity(intent) } catch (_: Exception) {
+                // Algunos fabricantes no tienen esta pantalla; mandamos a la
+                // lista general de apps con batería sin restricciones.
+                try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+                catch (_: Exception) {
+                    Toast.makeText(this, "Buscá PortalDroid en Ajustes → Batería", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        caja.addView(boton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        return caja
+    }
+
+    /**
+     * Tarjeta con la perilla del volumen REAL del parlante del celular
+     * (`STREAM_MUSIC`, el mismo de siempre — pero ojo: mientras se está
+     * mandando audio a la PC, los botones físicos dejan de tocar esto y
+     * pasan a controlar el volumen enviado, ver
+     * TouchAccessibilityService.onKeyEvent). Esta perilla de acá sigue
+     * siendo la única forma de bajar el parlante en ese momento.
+     *
+     * Sirve para cortar el eco de escuchar todo doble sin perder nada del
+     * lado de la PC: la captura de audio (`AudioPlaybackCapture`) lee las
+     * muestras ANTES de esta etapa, así que bajar esto a 0 deja mudo el
+     * parlante pero no toca un solo bit de lo que se manda por WiFi.
+     */
+    private fun controlParlante(): View {
+        val caja = LinearLayout(this)
+        caja.orientation = LinearLayout.VERTICAL
+        caja.setPadding(dp(18), dp(16), dp(18), dp(16))
+        caja.background = fondoRedondo(TARJETA)
+
+        val audioMgr = getSystemService(AUDIO_SERVICE) as AudioManager
+        val maximo = maxOf(1, audioMgr.getStreamMaxVolume(AudioManager.STREAM_MUSIC))
+
         val fila = LinearLayout(this)
         fila.orientation = LinearLayout.HORIZONTAL
         val titulo = TextView(this)
-        titulo.text = "Volumen enviado a la PC"
+        titulo.text = "Volumen del parlante del celular"
         titulo.textSize = 16f
         titulo.setTextColor(TEXTO)
         titulo.layoutParams =
@@ -195,25 +271,25 @@ class MainActivity : AppCompatActivity() {
         caja.addView(fila)
 
         val detalle = TextView(this)
-        detalle.text = "Sube o baja el audio que le llega a la PC. No afecta el " +
-                "parlante del celular ni necesita reiniciar la transmisión."
+        detalle.text = "Bajalo a 0 para que no suene por el parlante mientras mirás " +
+                "todo desde la PC. Es el volumen normal del celular: lo mismo que " +
+                "suben y bajan los botones físicos."
         detalle.textSize = 13f
         detalle.setTextColor(SUAVE)
         detalle.setPadding(0, dp(5), 0, dp(8))
         caja.addView(detalle)
 
         val barra = SeekBar(this)
-        // 0% a 200%: 100 es el audio tal cual viene, sin ganancia. Con más de
-        // 100 se puede sobrepasar el rango de un short; aplicarGanancia() lo
-        // recorta para que no se convierta en ruido.
-        barra.max = 200
-        val inicial = (Pairing.leerVolumenEnviado(this) * 100).toInt().coerceIn(0, 200)
+        barra.max = maximo
+        val inicial = audioMgr.getStreamVolume(AudioManager.STREAM_MUSIC)
         barra.progress = inicial
-        valorTexto.text = "$inicial%"
+        valorTexto.text = "${inicial * 100 / maximo}%"
         barra.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, valor: Int, desdeUsuario: Boolean) {
-                valorTexto.text = "$valor%"
-                if (desdeUsuario) AudioStreamService.setVolumen(this@MainActivity, valor / 100f)
+                valorTexto.text = "${valor * 100 / maximo}%"
+                // flags=0: cambia el volumen sin mostrar el cartel grande de
+                // "Volumen multimedia" que Android tira por encima de todo.
+                if (desdeUsuario) audioMgr.setStreamVolume(AudioManager.STREAM_MUSIC, valor, 0)
             }
             override fun onStartTrackingTouch(sb: SeekBar?) {}
             override fun onStopTrackingTouch(sb: SeekBar?) {}
@@ -266,13 +342,19 @@ class MainActivity : AppCompatActivity() {
         val enlazado = svc?.conectado == true
         val audio = AudioStreamService.running
 
+        // Una vez que el usuario saca la app de la optimización de batería,
+        // la tarjeta que se lo pide ya no sirve para nada.
+        tarjetaBateria.visibility = if (sinOptimizacionDeBateria()) View.GONE else View.VISIBLE
+
         when {
             activado && corriendo -> pasoAccesibilidad.pintar(
                 true, "Listo. Android le dio permiso de tocar la pantalla.", null)
             activado -> pasoAccesibilidad.pintar(
                 false,
-                "Android dice que está activado pero el servicio no arrancó. " +
-                    "Probá apagarlo y prenderlo de nuevo.",
+                "Android dice que está activado pero el servicio se apagó solo, " +
+                    "seguramente por ahorro de batería. Probá apagarlo y prenderlo de " +
+                    "nuevo, y sacá la app de la optimización de batería más abajo para " +
+                    "que no vuelva a pasar.",
                 "Abrir Ajustes de accesibilidad") { abrirAjustes() }
             else -> pasoAccesibilidad.pintar(
                 false,
